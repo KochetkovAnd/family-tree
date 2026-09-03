@@ -105,13 +105,27 @@ export function layoutTree(
     }
   })
 
+  // Within a mixed-gender couple, the man always renders on the left (and
+  // the woman on the right) — order is otherwise arbitrary (first-encountered)
+  // for same-gender couples, since there's no such convention to apply there.
+  const orderCouple = (memberIds: string[]): string[] => {
+    if (memberIds.length !== 2) return memberIds
+    const [a, b] = memberIds
+    const genderA = nodeById.get(a)?.gender
+    const genderB = nodeById.get(b)?.gender
+    if (genderA === 'FEMALE' && genderB === 'MALE') return [b, a]
+    return memberIds
+  }
+
   interface Unit { id: string; memberIds: string[]; depth: number }
   const unitOfPerson = new Map<string, string>()
   const units: Unit[] = []
   for (const node of nodes) {
     if (unitOfPerson.has(node.id)) continue
     const spouseId = spouseOf.get(node.id)
-    const memberIds = spouseId && !unitOfPerson.has(spouseId) ? [node.id, spouseId] : [node.id]
+    const memberIds = orderCouple(
+      spouseId && !unitOfPerson.has(spouseId) ? [node.id, spouseId] : [node.id],
+    )
     const unitId = `unit-${node.id}`
     memberIds.forEach((id) => unitOfPerson.set(id, unitId))
     units.push({ id: unitId, memberIds, depth: Math.min(...memberIds.map((id) => depth.get(id) ?? 0)) })

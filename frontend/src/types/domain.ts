@@ -27,6 +27,7 @@ export interface TreeNode {
   firstName: string
   lastName: string
   middleName?: string
+  gender: Gender
   birthDate?: string
   deathDate?: string
   thumbnailUrl?: string

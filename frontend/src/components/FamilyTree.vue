@@ -5,6 +5,7 @@ import { Background } from '@vue-flow/background'
 import { Controls } from '@vue-flow/controls'
 import { getTree, resetDb } from '../api'
 import { layoutTree, type EdgeKind } from '../composables/useTreeLayout'
+import { surnameKey } from '../utils/surname'
 import PersonNode from './PersonNode.vue'
 import UnionNode from './UnionNode.vue'
 import PersonEditModal from './PersonEditModal.vue'
@@ -16,6 +17,10 @@ const edges = ref<Edge[]>([])
 const loading = ref(true)
 const openPersonId = ref<string | null>(null)
 const creatingNew = ref(false)
+// Grouped by surnameKey so gendered forms of the same family name (Иванов /
+// Иванова) show up as one selectable entry instead of splitting the family.
+const lastNameGroups = ref<{ key: string; label: string }[]>([])
+const highlightedKey = ref('')
 
 const edgeStyle: Record<EdgeKind, { stroke: string; dash?: string; arrow?: boolean }> = {
   'parent-union': { stroke: '#3b6ea5' },
@@ -45,6 +50,19 @@ async function loadTree() {
     selectable: false,
   }))
   nodes.value = [...personNodes, ...unionNodes] as unknown as Node[]
+
+  const variantsByKey = new Map<string, Set<string>>()
+  laidOut.nodes.forEach((n) => {
+    const key = surnameKey(n.data.lastName)
+    if (!variantsByKey.has(key)) variantsByKey.set(key, new Set())
+    variantsByKey.get(key)!.add(n.data.lastName)
+  })
+  lastNameGroups.value = [...variantsByKey.entries()]
+    .map(([key, variants]) => ({
+      key,
+      label: [...variants].sort((a, b) => a.localeCompare(b, 'ru')).join(' / '),
+    }))
+    .sort((a, b) => a.label.localeCompare(b.label, 'ru'))
 
   edges.value = laidOut.edges.map((e) => {
     const style = edgeStyle[e.kind]
@@ -103,6 +121,10 @@ const activeModalPersonId = computed(() => openPersonId.value)
     <header class="toolbar">
       <h1>Семейное дерево</h1>
       <div class="toolbar-actions">
+        <select v-model="highlightedKey" class="last-name-select">
+          <option value="">Подсветить фамилию…</option>
+          <option v-for="group in lastNameGroups" :key="group.key" :value="group.key">{{ group.label }}</option>
+        </select>
         <button class="btn" @click="openCreate">+ Новый человек</button>
         <button class="btn btn-ghost" @click="onReset">Сбросить демо-данные</button>
       </div>
@@ -120,7 +142,12 @@ const activeModalPersonId = computed(() => openPersonId.value)
         @node-click="onNodeClick"
       >
         <template #node-person="props">
-          <PersonNode :data="props.data" :selected="props.selected" />
+          <PersonNode
+            :data="props.data"
+            :selected="props.selected"
+            :highlighted="!!highlightedKey && surnameKey(props.data.lastName) === highlightedKey"
+            :dimmed="!!highlightedKey && surnameKey(props.data.lastName) !== highlightedKey"
+          />
         </template>
         <template #node-union>
           <UnionNode />
@@ -160,7 +187,16 @@ const activeModalPersonId = computed(() => openPersonId.value)
 }
 .toolbar-actions {
   display: flex;
+  align-items: center;
   gap: 8px;
+}
+.last-name-select {
+  padding: 6px 8px;
+  border: 1px solid #d6dbe3;
+  border-radius: 7px;
+  font-size: 13px;
+  color: #1c1e21;
+  background: #fff;
 }
 .canvas {
   flex: 1;

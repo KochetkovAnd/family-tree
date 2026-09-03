@@ -10,6 +10,7 @@ function toNode(person: Person): TreeNode {
     firstName: person.firstName,
     lastName: person.lastName,
     middleName: person.middleName,
+    gender: person.gender,
     birthDate: person.birthDate,
     deathDate: person.deathDate,
     thumbnailUrl: photo?.thumbnailUrl,

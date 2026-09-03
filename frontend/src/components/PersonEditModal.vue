@@ -11,7 +11,7 @@ import {
 } from '../api'
 import type { Gender, Person, PersonInput, Relatives, Relationship, RelationshipType } from '../types/domain'
 import PhotoGallery from './PhotoGallery.vue'
-import RelationAddForm, { type RelationKind } from './RelationAddForm.vue'
+import RelationAddForm from './RelationAddForm.vue'
 
 const props = defineProps<{ personId: string | null }>()
 const emit = defineEmits<{ close: [changed: boolean] }>()
@@ -39,7 +39,16 @@ const primaryPhotoId = ref<string | undefined>(undefined)
 
 const relatives = ref<Relatives>({ parents: [], children: [], spouses: [], siblings: [] })
 const relationshipRecords = ref<Relationship[]>([])
-const activeAddKind = ref<RelationKind | null>(null)
+const addFormOpen = ref(false)
+
+interface RelationRow { person: Person; type: RelationshipType; label: string }
+
+const relationRows = computed<RelationRow[]>(() => [
+  ...relatives.value.parents.map((person) => ({ person, type: 'PARENT_CHILD' as const, label: 'Родитель' })),
+  ...relatives.value.children.map((person) => ({ person, type: 'PARENT_CHILD' as const, label: 'Ребёнок' })),
+  ...relatives.value.spouses.map((person) => ({ person, type: 'SPOUSE' as const, label: 'Супруг(а)' })),
+  ...relatives.value.siblings.map((person) => ({ person, type: 'SIBLING' as const, label: 'Брат/сестра' })),
+])
 
 const isCreating = computed(() => currentId.value === null)
 const title = computed(() =>
@@ -98,12 +107,12 @@ async function removeRelationship(type: RelationshipType, related: Person, label
   changed.value = true
 }
 
-function toggleAdd(kind: RelationKind) {
-  activeAddKind.value = activeAddKind.value === kind ? null : kind
+function toggleAdd() {
+  addFormOpen.value = !addFormOpen.value
 }
 
 async function onRelationAdded() {
-  activeAddKind.value = null
+  addFormOpen.value = false
   await refreshRelatives()
   changed.value = true
 }
@@ -163,13 +172,6 @@ async function removePerson() {
 function close() {
   emit('close', changed.value)
 }
-
-const addButtons: { kind: RelationKind; label: string }[] = [
-  { kind: 'PARENT', label: '+ Родитель' },
-  { kind: 'CHILD', label: '+ Ребёнок' },
-  { kind: 'SPOUSE', label: '+ Супруг(а)' },
-  { kind: 'SIBLING', label: '+ Брат/сестра' },
-]
 </script>
 
 <template>
@@ -212,65 +214,37 @@ const addButtons: { kind: RelationKind; label: string }[] = [
         </section>
 
         <section v-if="!isCreating" class="section">
-          <h3>Родственные связи</h3>
-
-          <div class="relation-group">
-            <h4>Родители</h4>
-            <ul>
-              <li v-for="p in relatives.parents" :key="p.id">
-                {{ p.lastName }} {{ p.firstName }}
-                <button type="button" class="remove" @click="removeRelationship('PARENT_CHILD', p, 'родитель')">✕</button>
-              </li>
-            </ul>
-          </div>
-          <div class="relation-group">
-            <h4>Дети</h4>
-            <ul>
-              <li v-for="p in relatives.children" :key="p.id">
-                {{ p.lastName }} {{ p.firstName }}
-                <button type="button" class="remove" @click="removeRelationship('PARENT_CHILD', p, 'ребёнок')">✕</button>
-              </li>
-            </ul>
-          </div>
-          <div class="relation-group">
-            <h4>Супруги</h4>
-            <ul>
-              <li v-for="p in relatives.spouses" :key="p.id">
-                {{ p.lastName }} {{ p.firstName }}
-                <button type="button" class="remove" @click="removeRelationship('SPOUSE', p, 'супруг(а)')">✕</button>
-              </li>
-            </ul>
-          </div>
-          <div class="relation-group">
-            <h4>Братья/сёстры</h4>
-            <ul>
-              <li v-for="p in relatives.siblings" :key="p.id">
-                {{ p.lastName }} {{ p.firstName }}
-                <button type="button" class="remove" @click="removeRelationship('SIBLING', p, 'брат/сестра')">✕</button>
-              </li>
-            </ul>
-          </div>
-
-          <div class="add-buttons">
-            <button
-              v-for="b in addButtons"
-              :key="b.kind"
-              type="button"
-              class="btn btn-ghost small"
-              @click="toggleAdd(b.kind)"
-            >
-              {{ b.label }}
-            </button>
+          <div class="section-header">
+            <h3>Родственные связи</h3>
+            <button type="button" class="btn btn-ghost small" @click="toggleAdd">+ Добавить</button>
           </div>
 
           <RelationAddForm
-            v-if="activeAddKind"
-            :key="activeAddKind"
-            :kind="activeAddKind"
+            v-if="addFormOpen"
             :person-id="currentId!"
             @added="onRelationAdded"
-            @cancel="activeAddKind = null"
+            @cancel="addFormOpen = false"
           />
+
+          <table v-if="relationRows.length" class="relations-table">
+            <thead>
+              <tr>
+                <th>Человек</th>
+                <th>Связь</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="row in relationRows" :key="row.type + row.label + row.person.id">
+                <td>{{ row.person.lastName }} {{ row.person.firstName }}</td>
+                <td>{{ row.label }}</td>
+                <td class="remove-cell">
+                  <button type="button" class="remove" @click="removeRelationship(row.type, row.person, row.label)">✕</button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <p v-else class="hint">Родственных связей пока нет.</p>
         </section>
       </div>
 
@@ -366,31 +340,43 @@ textarea {
   font-size: 14px;
   margin: 0 0 10px;
 }
-.hint-section .hint {
+.hint {
   font-size: 12px;
   color: #6b7280;
   margin: 0;
 }
-.relation-group {
-  margin-bottom: 8px;
-}
-.relation-group h4 {
-  font-size: 12px;
-  color: #6b7280;
-  margin: 0 0 4px;
-  font-weight: 600;
-}
-.relation-group ul {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-.relation-group li {
+.section-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  margin-bottom: 10px;
+}
+.section-header h3 {
+  margin: 0;
+}
+.relations-table {
+  width: 100%;
+  border-collapse: collapse;
   font-size: 13px;
-  padding: 4px 0;
+}
+.relations-table th {
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  color: #6b7280;
+  padding: 0 0 6px;
+  border-bottom: 1px solid #eee;
+}
+.relations-table td {
+  padding: 6px 0;
+  border-bottom: 1px solid #f3f4f6;
+}
+.relations-table td:nth-child(2) {
+  color: #4b5563;
+}
+.remove-cell {
+  text-align: right;
+  width: 24px;
 }
 .remove {
   border: none;
@@ -398,12 +384,6 @@ textarea {
   color: #b64545;
   cursor: pointer;
   font-size: 13px;
-}
-.add-buttons {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 10px;
 }
 .modal-footer {
   display: flex;

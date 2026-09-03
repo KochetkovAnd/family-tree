@@ -2,11 +2,13 @@
 import { computed } from 'vue'
 import { Handle, Position, useVueFlow } from '@vue-flow/core'
 import type { TreeNode } from '../types/domain'
-import { initialsOf } from '../api/avatar'
+import { genderColor, initialsOf } from '../api/avatar'
 
 const props = defineProps<{
   data: TreeNode
   selected?: boolean
+  highlighted?: boolean
+  dimmed?: boolean
 }>()
 
 // LOD: below the zoom threshold only name + years render — no <img> is even
@@ -15,6 +17,10 @@ const PHOTO_ZOOM_THRESHOLD = 0.75
 
 const { viewport } = useVueFlow()
 const showPhoto = computed(() => viewport.value.zoom >= PHOTO_ZOOM_THRESHOLD)
+
+// A colored accent independent of the photo, so gender still reads at low
+// zoom where the photo isn't mounted at all (see showPhoto above).
+const accentColor = computed(() => genderColor(props.data.gender))
 
 const fullName = computed(() => `${props.data.lastName} ${props.data.firstName}`)
 const years = computed(() => {
@@ -26,7 +32,16 @@ const years = computed(() => {
 </script>
 
 <template>
-  <div class="person-node" :class="{ 'is-selected': selected, 'is-deceased': !!data.deathDate }">
+  <div
+    class="person-node"
+    :class="{
+      'is-selected': selected,
+      'is-deceased': !!data.deathDate,
+      'is-highlighted': highlighted,
+      'is-dimmed': dimmed,
+    }"
+    :style="{ borderLeftColor: accentColor }"
+  >
     <Handle id="t" type="target" :position="Position.Top" class="anchor" />
     <Handle id="ts" type="source" :position="Position.Top" class="anchor" />
     <Handle id="b" type="source" :position="Position.Bottom" class="anchor" />
@@ -59,6 +74,9 @@ const years = computed(() => {
   border-radius: 10px;
   background: var(--panel-bg, #fff);
   border: 2px solid #d6dbe3;
+  /* Overridden per-instance via :style to the gender color — always visible,
+     unlike the photo which only mounts past the LOD zoom threshold. */
+  border-left-width: 5px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
   text-align: center;
   cursor: pointer;
@@ -69,6 +87,12 @@ const years = computed(() => {
 }
 .person-node.is-deceased {
   background: #f4f4f4;
+}
+.person-node.is-highlighted {
+  box-shadow: 0 0 0 3px #f5b942, 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+.person-node.is-dimmed {
+  opacity: 0.3;
 }
 .anchor {
   opacity: 0;

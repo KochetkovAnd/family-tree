@@ -82,9 +82,11 @@ relaxation loop (otherwise someone marrying in — or a known sibling — with n
 parents on record defaults to depth 0 and drags their whole row back to the
 top). Spouses are grouped into a single "unit" so they render adjacently; a
 unit's horizontal position is the average of its parents' unit positions from
-the row above. This is a from-scratch heuristic tuned for family trees, not a
-generic graph-layout algorithm — don't expect it to handle arbitrary cyclic
-graphs.
+the row above. Within a mixed-gender couple the man always ends up on the
+left (`orderCouple()`) — same-gender couples keep whatever order they were
+first encountered in, since there's no equivalent convention to apply there.
+This is a from-scratch heuristic tuned for family trees, not a generic
+graph-layout algorithm — don't expect it to handle arbitrary cyclic graphs.
 
 **Parent/child edges are NOT drawn directly between parent and child.** Every
 distinct parent-set (i.e. every couple, or lone parent, that has children) gets
@@ -164,19 +166,46 @@ nodes actually rendered at that size, which is what keeps a large tree cheap
 `Photo.url` images only inside the person edit modal or its photo gallery,
 never on the graph itself.
 
+Gender is therefore also carried as its own `TreeNode.gender` field rather
+than only implied by photo color — a colored left border on `PersonNode.vue`
+(`genderColor()` in `src/api/avatar.ts`, shared with the placeholder-avatar
+generator so the two can't drift apart) stays visible at every zoom level,
+including the low-zoom/no-photo state.
+
+### Last-name highlight
+
+The toolbar's `<select>` in `FamilyTree.vue` lists surname groups, not raw
+`lastName` strings — Russian surnames decline by gender (Иванов/Иванова,
+Достоевский/Достоевская), and `surnameKey()` (`src/utils/surname.ts`)
+normalizes both forms to the same key so a couple/family doesn't get split
+into two dropdown entries. Groups (recomputed in `loadTree()` off
+`laidOut.nodes`, not fetched separately) are labeled with every literal
+variant seen, joined by `/` (e.g. "Иванов / Иванова"). Picking one doesn't
+refetch or re-layout anything — it just sets `highlightedKey`, matched via
+`surnameKey(node.lastName) === highlightedKey` inline in the `#node-person`
+slot, which flows into `PersonNode`'s `highlighted`/`dimmed` props. Matching
+nodes get a gold outline, everyone else fades to low opacity; clearing the
+select (empty string) turns both off. `surnameKey()` is a heuristic (strips
+the feminine `-а`/`-ая`/`-ская` endings), not a full morphology engine — an
+unrecognized ending just passes through unchanged, which is safe (worst case
+it stays its own single-item group instead of merging).
+
 ### Person edit modal
 
 Opens on clicking a node. Two concerns:
 
 1. **Person fields** — a plain form over every `Person` field from the
    contract, saved via `PUT /api/persons/{id}`.
-2. **Relationships** — list current relatives grouped by type (parents /
-   children / spouses / siblings), each row with a remove control that
-   confirms then calls `DELETE /api/relationships/{id}`. To add one: pick a
-   relation kind from the current person's point of view (e.g. "add child",
-   "add spouse", "add sibling" — the direction/type follow from that choice),
-   then either search an existing person (`GET /api/persons?search=`) or,
-   if no match, quick-create one inline (name fields only) before the
-   relationship is created via `POST /api/relationships`. Prefer this
-   create-inline path as the default for a fresh tree — most adds are new
-   people, not links between two already-entered ones.
+2. **Relationships** — a single table (`relationRows` in `PersonEditModal.vue`,
+   flattened from `getRelatives()`'s parents/children/spouses/siblings groups):
+   person on the left, relation label on the right, remove control (confirms,
+   then `DELETE /api/relationships/{id}`) on the end. One "+ Добавить" button
+   next to the "Родственные связи" heading opens `RelationAddForm.vue`, which
+   itself now owns the relation-kind choice (a `<select>` — Родитель / Ребёнок
+   / Супруг(а) / Брат/сестра, defaulting to Ребёнок since most adds to a fresh
+   tree are new children) instead of that being picked via which of four
+   separate buttons was clicked. The direction/type still follow from that
+   choice, not from the picked person. From there: either search an existing
+   person (`GET /api/persons?search=`) or, if no match, quick-create one
+   inline (name fields only) before the relationship is created via
+   `POST /api/relationships`.
