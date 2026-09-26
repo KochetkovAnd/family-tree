@@ -4,12 +4,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project status
 
-Frontend is scaffolded and functional against a mock backend (see below).
-`backend/` does not exist yet — it's owned and written by the user separately.
+Frontend is scaffolded and functional against a mock backend for tree data
+(see below). `backend/` now exists but only implements auth (register/login,
+JWT, bcrypt) — Person/Relationship/Photo/Tree-CRUD endpoints aren't built yet,
+so the frontend's tree data still comes entirely from the in-memory mock.
 
 ## Commands
 
-Run from `frontend/`:
+Frontend, run from `frontend/`:
 
 ```
 npm run dev      # start Vite dev server (http://localhost:5173)
@@ -19,15 +21,25 @@ npm run preview  # serve the production build locally
 
 There is no test suite yet. No lint script is configured.
 
+Backend, run from `backend/` (needs Postgres reachable per `application.yml`,
+and a JDK 21 — `mvn` isn't on PATH in this environment; a wrapper build is
+cached under `~/.m2/wrapper/dists/`, and `JAVA_HOME` needs to point at a JDK 21
+such as `~/.jdks/corretto-21.*` — see IDE's configured SDK):
+
+```
+mvn compile          # compile
+mvn spring-boot:run  # run — Tomcat on :8080
+```
+
 ## Division of ownership
 
-- **Backend** (Java + Spring, PostgreSQL): owned and written by the user. Claude
-  should not write backend code unless explicitly asked — its role here is to stay
-  contract-compatible with it.
+- **Backend** (Java + Spring, PostgreSQL): owned by the user; Claude writes
+  backend code only when explicitly asked (auth was — see below). Otherwise
+  its role is to stay contract-compatible with whatever the user builds.
 - **Frontend** (Vue 3 + TypeScript + Vite): owned and written by Claude, lives in
   `frontend/`.
 - `docs/` — shared docs, including the API contract.
-- `backend/` doesn't exist yet; when it does, `docs/api.md` is what it must match.
+- `docs/api.md` is what `backend/` must match as it grows past auth.
 
 ## API contract
 
@@ -37,7 +49,10 @@ sync with whichever side changes first; don't let the contract drift silently ou
 of either codebase.
 
 Key design decisions baked into the contract:
-- No auth / multi-user model at this stage — one shared tree, no login.
+- Auth is JWT-based (see "Authentication" below). A `Tree` is its own entity,
+  deliberately not owned by a single user — access is granted via a separate
+  `UserFamilyTree` join (a user has a *list* of trees they can reach), with no
+  access-level granularity yet (a row = full access; that's a deferred decision).
 - `SIBLING` is a real, explicitly stored relationship type alongside
   `PARENT_CHILD` and `SPOUSE` — not purely derived from shared parents, since a
   sibling link can be known before the shared parent is entered.
@@ -51,6 +66,110 @@ Key design decisions baked into the contract:
 - Graph endpoints return a lightweight `TreeNode` projection (name, dates,
   `thumbnailUrl` string), never the full `Person` — the full record is fetched
   separately only when a person's edit modal opens.
+
+## Authentication
+
+The one part of the system that's real end-to-end (not mocked) — bcrypt/JWT
+only mean something server-side, so this couldn't be faked in the frontend
+mock like tree data is.
+
+**Backend** (`backend/src/main/java/com/kochetkov/familytree/`):
+- **Column naming convention**: every table's own id/audit columns are
+  prefixed with that table's name — `users_id`, `users_created_at`,
+  `family_tree_id`, `user_family_tree_deleted_by`, etc. (FK columns are the
+  exception: `user_family_tree.user_id`/`tree_id` name what they point *to*,
+  not the owning table — the more useful convention for join columns
+  specifically). This is deliberate and applies to every future entity, not
+  just the three that exist today — keep it going.
+- `entity/User`, `entity/Tree`, `entity/UserFamilyTree` (the access join,
+  renamed from `UserTreeAccess` — table is `user_family_tree`) extend
+  `AuditEntity` → `BaseIdEntity`. Each concrete entity carries an
+  `@AttributeOverrides` block remapping all 7 inherited columns (`id`,
+  `createdAt`, `createdBy`, `updatedAt`, `updatedBy`, `deletedAt`,
+  `deletedBy`) to its own prefixed names — copy that whole block (swapping
+  the prefix) for any new entity, don't hand-pick a subset.
+- **Per-entity sequences, and the one JPA wrinkle that comes with it**:
+  `BaseIdEntity.id` carries `@GeneratedValue(generator =
+  "entity_id_seq_generator")` — that generator *name* is a fixed literal
+  every entity is stuck sharing, because JPA gives no way for a subclass to
+  override an inherited `@GeneratedValue`. What actually differs per table is
+  the real Postgres sequence: each concrete entity adds its own class-level
+  `@SequenceGenerator(name = "entity_id_seq_generator", sequenceName =
+  "<table>_id_seq", ...)` — Hibernate resolves the entity-local declaration
+  for that entity specifically, so `users`/`family_tree`/`user_family_tree`
+  each get their own independent sequence despite the shared generator-name
+  token. **Any new entity that forgets this `@SequenceGenerator` annotation
+  silently falls back to no working generator** — always add it.
+- `createdAt`/`updatedAt` are `LocalDateTime` (not `Instant` — changed
+  deliberately), populated by `@CreatedDate`/`@LastModifiedDate` via
+  `@EnableJpaAuditing` on `FamilyTreeApplication`. `createdBy`/`updatedBy`
+  (`@CreatedBy`/`@LastModifiedBy`) are populated by
+  `security/SecurityAuditorAware` — the current authenticated principal's
+  email, or the literal string `"system"` when there isn't one (e.g.
+  self-registration, where the row being written is the not-yet-authenticated
+  actor). `deletedAt`/`deletedBy` exist as plain nullable columns only —
+  **nothing populates or filters on them yet**; an actual `DELETE` is still a
+  real `DELETE`. Don't assume soft delete is implemented just because the
+  columns exist.
+- `security/JwtService` issues/parses tokens (`io.jsonwebtoken` / jjwt 0.12,
+  HS256, secret + expiry from `app.jwt.*` in `application.yml`).
+  `security/JwtAuthenticationFilter` reads `Authorization: Bearer <token>` and
+  populates `SecurityContextHolder`. `security/SecurityConfig` wires it in
+  stateless (`SessionCreationPolicy.STATELESS`, CSRF disabled — there's no
+  cookie for CSRF to protect), permits `/api/auth/**`, requires auth on
+  everything else, and answers unauthenticated requests with a JSON 401
+  (`JsonAuthenticationEntryPoint`) matching the `{error, message}` shape the
+  rest of the contract uses, instead of Spring Security's default blank 403.
+- **`JwtAuthenticationFilter` is deliberately not a `@Component`** —
+  `SecurityConfig` constructs it with `new` and wires it directly into the
+  chain. Making an `OncePerRequestFilter` a top-level bean risks Spring Boot's
+  embedded-container auto-configuration *also* registering it as a plain
+  servlet filter outside Spring Security's own chain; keeping it a plain class
+  sidesteps the question. Don't re-add `@Component` there without retesting a
+  real protected endpoint end-to-end (see the next point for why that matters).
+- Passwords are hashed with `BCryptPasswordEncoder` (`SecurityConfig` provides
+  the bean) — `AuthService` never stores or compares raw passwords.
+- **Testing auth locally: use an endpoint that actually exists.** Hitting a
+  route with no `@RequestMapping` (e.g. `/api/persons`, which isn't built yet)
+  404s, and Spring's internal forward-to-`/error` re-runs the security chain a
+  second time — the response you get back reflects that second pass, not the
+  first, which can look exactly like "valid tokens are being rejected" when
+  they aren't. Test against `/api/auth/**` (open) or a route that's actually
+  mapped, not a guessed one.
+- `spring.jpa.hibernate.ddl-auto` is `validate` — Hibernate checks the schema
+  matches the entities at startup and refuses to start on a mismatch, but
+  never creates or alters anything itself. **There is no migration tool
+  (Flyway/Liquibase) wired up** — this was a deliberate choice over adding one.
+  Practical consequence: any entity change (new field, renamed/retyped column,
+  a whole new entity) needs its DDL applied by hand against Postgres (`psql`,
+  or any client) *before* the next `mvn spring-boot:run`, or startup fails
+  validation. When a schema change is big enough that hand-editing the
+  existing tables is more trouble than it's worth (e.g. the `users_id`-style
+  rename this session), it's fine in dev — with no real data at stake — to
+  just `DROP TABLE` the affected tables and let a one-off `ddl-auto: update`
+  run recreate them from the entities, then switch back to `validate`.
+  Likewise `app.jwt.secret` in that file is a checked-in
+  placeholder, not something to deploy anywhere with.
+
+**Frontend** (`frontend/src/auth/`): the one exception to "everything talks to
+the mock" — `authApi.ts` calls the real backend directly
+(`http://localhost:8080/api/auth/...`, hardcoded for now) with `fetch()`, not
+through `src/api/`. `authState.ts` is a module-level reactive singleton (same
+pattern as `src/api/db.ts` — no Pinia) holding the current `AuthSession`,
+persisted to `localStorage` under `family-tree-auth-session`. `App.vue` gates
+the whole app on `session` being set: `LoginPage.vue` (login/register toggle
+in one form) when it isn't, `FamilyTree.vue` when it is. `FamilyTree.vue`'s
+toolbar shows the current `displayName` and a "Выйти" button (`clearSession()`
+from `authState.ts`) — logging out just clears the session ref/localStorage,
+no backend call (there's no server-side session to invalidate; the JWT stays
+valid until it expires).
+
+Not wired up yet: `src/api/*` (tree data) doesn't send the `Authorization`
+header from `authState.ts`'s `authHeader()` — it doesn't need to, since it
+still talks to the in-memory mock, not the real backend. Once Person/
+Relationship/Photo endpoints exist for real and `src/api/*` switches to
+`fetch()`, that's the point to start attaching `authHeader()` to those calls
+too.
 
 ## Frontend architecture
 

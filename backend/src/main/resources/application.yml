@@ -1,0 +1,26 @@
+spring:
+  application:
+    name: family-tree
+  datasource:
+    url: jdbc:postgresql://localhost:5432/family-tree
+    username: admin
+    password: root
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      # Hibernate only checks the schema matches the entities now — it never
+      # creates or alters tables/columns. No migration tool (Flyway/Liquibase)
+      # is wired up, so from here on, any entity change (new field, renamed
+      # column, new entity, ...) needs its DDL applied by hand (e.g. via psql)
+      # BEFORE the app is restarted, or startup fails validation. This was a
+      # deliberate choice over adding Flyway — revisit if hand-written SQL
+      # becomes a bottleneck.
+      ddl-auto: validate
+
+app:
+  jwt:
+    # 32+ bytes required for HS256. This is a placeholder for local dev only —
+    # move it to an environment variable (and rotate it) before deploying
+    # anywhere real; anyone with this value can forge valid tokens.
+    secret: "dev-only-change-me-1234567890-please-replace-this-secret-value"
+    expiration-minutes: 60

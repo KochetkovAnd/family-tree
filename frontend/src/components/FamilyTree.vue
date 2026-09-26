@@ -6,6 +6,7 @@ import { Controls } from '@vue-flow/controls'
 import { getTree, resetDb } from '../api'
 import { layoutTree, type EdgeKind } from '../composables/useTreeLayout'
 import { surnameKey } from '../utils/surname'
+import { session, clearSession } from '../auth/authState'
 import PersonNode from './PersonNode.vue'
 import UnionNode from './UnionNode.vue'
 import PersonEditModal from './PersonEditModal.vue'
@@ -127,6 +128,8 @@ const activeModalPersonId = computed(() => openPersonId.value)
         </select>
         <button class="btn" @click="openCreate">+ Новый человек</button>
         <button class="btn btn-ghost" @click="onReset">Сбросить демо-данные</button>
+        <span v-if="session" class="user-name">{{ session.displayName }}</span>
+        <button class="btn btn-ghost" @click="clearSession">Выйти</button>
       </div>
     </header>
 
@@ -197,6 +200,11 @@ const activeModalPersonId = computed(() => openPersonId.value)
   font-size: 13px;
   color: #1c1e21;
   background: #fff;
+}
+.user-name {
+  font-size: 13px;
+  color: #6b7280;
+  margin-left: 4px;
 }
 .canvas {
   flex: 1;
