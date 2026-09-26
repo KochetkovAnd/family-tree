@@ -1,4 +1,4 @@
-package com.kochetkov.familytree.service;
+package com.kochetkov.familytree.service.auth;
 
 import com.kochetkov.familytree.dto.auth.AuthResponse;
 import com.kochetkov.familytree.dto.auth.LoginRequest;

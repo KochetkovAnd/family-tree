@@ -1,7 +1,7 @@
 package com.kochetkov.familytree.repository;
 
 import com.kochetkov.familytree.entity.FamilyTree;
-import org.springframework.data.jpa.repository.JpaRepository;
+import com.kochetkov.familytree.repository.base.AuditEntityRepository;
 
-public interface FamilyTreeRepository extends JpaRepository<FamilyTree, Long> {
+public interface FamilyTreeRepository extends AuditEntityRepository<FamilyTree> {
 }

@@ -3,7 +3,7 @@ package com.kochetkov.familytree.controller;
 import com.kochetkov.familytree.dto.auth.AuthResponse;
 import com.kochetkov.familytree.dto.auth.LoginRequest;
 import com.kochetkov.familytree.dto.auth.RegisterRequest;
-import com.kochetkov.familytree.service.AuthService;
+import com.kochetkov.familytree.service.auth.AuthService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
