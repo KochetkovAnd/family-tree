@@ -1,5 +1,6 @@
 import { ref } from 'vue'
 import type { AuthSession } from './types'
+import { clearSelectedTree } from '../state/selectedTree'
 
 const STORAGE_KEY = 'family-tree-auth-session'
 
@@ -25,6 +26,9 @@ export function setSession(next: AuthSession) {
 export function clearSession() {
   session.value = null
   localStorage.removeItem(STORAGE_KEY)
+  // Otherwise the next login (possibly as a different user) would reopen
+  // whatever tree id was last picked, which may not even be theirs.
+  clearSelectedTree()
 }
 
 export function authHeader(): Record<string, string> {

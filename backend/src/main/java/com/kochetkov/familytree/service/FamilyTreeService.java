@@ -7,10 +7,19 @@ import com.kochetkov.familytree.repository.FamilyTreeRepository;
 import com.kochetkov.familytree.service.base.AuditEntityService;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+
 @Service
 public class FamilyTreeService extends AuditEntityService<FamilyTree, FamilyTreeDTO, FamilyTreeRepository, FamilyTreeConverter> {
 
-    public FamilyTreeService(FamilyTreeRepository repository, FamilyTreeConverter converter) {
+    public FamilyTreeService(
+            FamilyTreeRepository repository,
+            FamilyTreeConverter converter
+    ) {
         super(repository, converter);
+    }
+
+    public List<FamilyTreeDTO> findByUserId(Long userId) {
+        return converter.toListDTO(repository.findByUserId(userId));
     }
 }

@@ -1,5 +1,5 @@
 import { ApiError } from '../api/errors'
-import type { AuthSession, LoginPayload, RegisterPayload } from './types'
+import type { AuthSession, LoginPayload } from './types'
 
 // The only part of the frontend that calls the real Spring backend directly —
 // everything else (src/api/*) still talks to the in-memory mock. Auth had to
@@ -27,8 +27,4 @@ async function post(path: string, body: unknown): Promise<AuthSession> {
 
 export function login(payload: LoginPayload): Promise<AuthSession> {
   return post('/login', payload)
-}
-
-export function register(payload: RegisterPayload): Promise<AuthSession> {
-  return post('/register', payload)
 }

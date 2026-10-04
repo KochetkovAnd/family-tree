@@ -9,10 +9,10 @@
 -- is NOT a fake/placeholder hash.
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
-INSERT INTO users (users_created_at, users_created_by, users_updated_at, users_updated_by, email, password_hash, display_name, enabled)
+INSERT INTO users (users_created_at, users_created_by, users_updated_at, users_updated_by, nickname, password_hash, display_name)
 VALUES
-    (now(), 'system', now(), 'system', 'ivan@example.com', crypt('password123', gen_salt('bf')), 'Иван Иванов', true),
-    (now(), 'system', now(), 'system', 'maria@example.com', crypt('password123', gen_salt('bf')), 'Мария Петрова', true);
+    (now(), 'system', now(), 'system', 'ivan', crypt('password123', gen_salt('bf')), 'Иван Иванов'),
+    (now(), 'system', now(), 'system', 'maria', crypt('password123', gen_salt('bf')), 'Мария Петрова');
 
 INSERT INTO family_tree (family_tree_created_at, family_tree_created_by, family_tree_updated_at, family_tree_updated_by, name)
 VALUES
@@ -22,8 +22,8 @@ VALUES
 INSERT INTO user_family_tree (user_family_tree_created_at, user_family_tree_created_by, user_family_tree_updated_at, user_family_tree_updated_by, user_id, tree_id)
 VALUES
     (now(), 'system', now(), 'system',
-     (SELECT users_id FROM users WHERE email = 'ivan@example.com'),
+     (SELECT users_id FROM users WHERE nickname = 'ivan'),
      (SELECT family_tree_id FROM family_tree WHERE name = 'Дерево Ивановых')),
     (now(), 'system', now(), 'system',
-     (SELECT users_id FROM users WHERE email = 'maria@example.com'),
+     (SELECT users_id FROM users WHERE nickname = 'maria'),
      (SELECT family_tree_id FROM family_tree WHERE name = 'Дерево Петровых'));

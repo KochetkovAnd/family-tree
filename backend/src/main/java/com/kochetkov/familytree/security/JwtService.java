@@ -29,12 +29,12 @@ public class JwtService {
         return expirationSeconds;
     }
 
-    /** Subject is the user's id (as a string) — stable even if email changes later. */
-    public String generateToken(Long userId, String email) {
+    /** Subject is the user's id (as a string) — stable even if nickname changes later. */
+    public String generateToken(Long userId, String nickname) {
         Instant now = Instant.now();
         return Jwts.builder()
                 .subject(String.valueOf(userId))
-                .claim("email", email)
+                .claim("nickname", nickname)
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(now.plusSeconds(expirationSeconds)))
                 .signWith(key)

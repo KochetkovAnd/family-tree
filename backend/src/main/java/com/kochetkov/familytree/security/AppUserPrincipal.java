@@ -39,11 +39,6 @@ public class AppUserPrincipal implements UserDetails {
 
     @Override
     public String getUsername() {
-        return user.getEmail();
-    }
-
-    @Override
-    public boolean isEnabled() {
-        return user.isEnabled();
+        return user.getNickname();
     }
 }

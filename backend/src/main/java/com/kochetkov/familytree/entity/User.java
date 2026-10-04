@@ -30,14 +30,11 @@ import lombok.experimental.FieldDefaults;
 public class User extends AuditEntity {
 
     @Column(nullable = false, unique = true)
-    String email;
+    String nickname;
 
     @Column(nullable = false)
     String passwordHash;
 
     @Column(nullable = false)
     String displayName;
-
-    @Column(nullable = false)
-    boolean enabled = true;
 }

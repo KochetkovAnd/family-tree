@@ -7,6 +7,7 @@ import { getTree, resetDb } from '../api'
 import { layoutTree, type EdgeKind } from '../composables/useTreeLayout'
 import { surnameKey } from '../utils/surname'
 import { session, clearSession } from '../auth/authState'
+import { selectedTree, clearSelectedTree } from '../state/selectedTree'
 import PersonNode from './PersonNode.vue'
 import UnionNode from './UnionNode.vue'
 import PersonEditModal from './PersonEditModal.vue'
@@ -120,7 +121,7 @@ const activeModalPersonId = computed(() => openPersonId.value)
 <template>
   <div class="tree-page">
     <header class="toolbar">
-      <h1>Семейное дерево</h1>
+      <h1>{{ selectedTree?.name ?? 'Семейное дерево' }}</h1>
       <div class="toolbar-actions">
         <select v-model="highlightedKey" class="last-name-select">
           <option value="">Подсветить фамилию…</option>
@@ -128,6 +129,7 @@ const activeModalPersonId = computed(() => openPersonId.value)
         </select>
         <button class="btn" @click="openCreate">+ Новый человек</button>
         <button class="btn btn-ghost" @click="onReset">Сбросить демо-данные</button>
+        <button class="btn btn-ghost" @click="clearSelectedTree">Сменить дерево</button>
         <span v-if="session" class="user-name">{{ session.displayName }}</span>
         <button class="btn btn-ghost" @click="clearSession">Выйти</button>
       </div>

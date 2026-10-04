@@ -4,7 +4,7 @@
 
 export interface AuthUser {
   userId: number
-  email: string
+  nickname: string
   displayName: string
 }
 
@@ -14,12 +14,6 @@ export interface AuthSession extends AuthUser {
 }
 
 export interface LoginPayload {
-  email: string
+  nickname: string
   password: string
-}
-
-export interface RegisterPayload {
-  email: string
-  password: string
-  displayName: string
 }

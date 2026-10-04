@@ -17,9 +17,9 @@ public class AppUserDetailsService implements UserDetailsService {
     }
 
     @Override
-    public UserDetails loadUserByUsername(String email) {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new UsernameNotFoundException("No user with email " + email));
+    public UserDetails loadUserByUsername(String nickname) {
+        User user = userRepository.findByNickname(nickname)
+                .orElseThrow(() -> new UsernameNotFoundException("No user with nickname " + nickname));
         return new AppUserPrincipal(user);
     }
 

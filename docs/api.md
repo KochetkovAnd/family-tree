@@ -25,7 +25,7 @@
 
 Общие для `User`/`Tree`/`UserFamilyTree` поля (унаследованы от `AuditEntity` в
 бэкенде): `createdAt`/`updatedAt` (`LocalDateTime`, всегда заполнены),
-`createdBy`/`updatedBy` (string — email пользователя или `"system"` для
+`createdBy`/`updatedBy` (string — nickname пользователя или `"system"` для
 неаутентифицированных операций вроде саморегистрации) и `deletedAt`/
 `deletedBy` (nullable — колонки для будущего soft-delete уже есть, но ничего
 их пока не заполняет и не фильтрует по ним: `DELETE` — по-прежнему настоящий
@@ -39,10 +39,9 @@
 | Поле | Тип | Описание |
 |---|---|---|
 | id | Long | |
-| email | string | Уникальный, используется как логин |
+| nickname | string | Уникальный, используется как логин |
 | passwordHash | string | bcrypt-хэш, никогда не передаётся клиенту |
 | displayName | string | |
-| enabled | boolean | |
 
 ### Tree
 
@@ -129,19 +128,25 @@ JWT в заголовке `Authorization: Bearer <token>`. Все `/api/**`, к�
 
 | Метод | URL | Описание |
 |---|---|---|
-| POST | `/api/auth/register` | `{ email, password, displayName }` → создаёт пользователя (пароль хэшируется bcrypt), возвращает токен + профиль |
-| POST | `/api/auth/login` | `{ email, password }` → возвращает токен + профиль либо `401 INVALID_CREDENTIALS` |
+| POST | `/api/auth/register` | `{ nickname, password, displayName }` → создаёт пользователя (пароль хэшируется bcrypt), возвращает токен + профиль. Фронтенд пока не вызывает этот URL — страница входа без переключателя на регистрацию, см. CLAUDE.md. |
+| POST | `/api/auth/login` | `{ nickname, password }` → возвращает токен + профиль либо `401 INVALID_CREDENTIALS` |
 
-Ответ обоих: `{ token, expiresInSeconds, userId, email, displayName }`.
-
-Списка деревьев пользователя (`GET /api/trees` или похожий) в контракте пока
-нет — `UserFamilyTree` в бэкенде уже есть, но эндпоинт для чтения списка
-доступных деревьев ещё не спроектирован; фронтенд соответственно тоже пока не
-умеет показывать больше одного дерева (см. CLAUDE.md).
+Ответ обоих: `{ token, expiresInSeconds, userId, nickname, displayName }`.
 
 ## Эндпоинты
 
 Базовый путь: `/api`. Формат: JSON, `Content-Type: application/json` (кроме загрузки фото).
+
+### Деревья пользователя
+
+| Метод | URL | Описание |
+|---|---|---|
+| GET | `/api/family-tree/find-by-user/{userId}` | Список деревьев, доступных пользователю (через `UserFamilyTree`) — массив `Tree` (`{ id, name, createdAt, createdBy, updatedAt, updatedBy, deletedAt, deletedBy }`). Как и всё, кроме `/api/auth/**`, требует `Authorization: Bearer <token>`. |
+
+Фронтенд вызывает этот URL сразу после логина, на отдельном экране выбора
+дерева (`TreeSelectPage.vue`) — выбранное дерево сохраняется в
+`localStorage` до выхода из системы. Создания дерева (`POST`) в контракте
+пока нет — только чтение списка уже существующих.
 
 ### Persons
 
@@ -211,6 +216,6 @@ HTTP-коды: 400 (валидация), 404 (не найдено), 409 (кон�
 ## Возможное развитие (не в стартовой версии)
 
 - Уровни доступа в `UserFamilyTree` (сейчас — только «есть строка = полный доступ»).
-- Эндпоинт(ы) для списка/создания деревьев пользователя (`GET/POST /api/trees`).
+- Создание дерева пользователем (`POST /api/family-tree` или похожий) — список чтения уже есть, создания пока нет.
 - Refresh-токены (сейчас JWT только с фиксированным TTL, без обновления).
 - Импорт/экспорт GEDCOM (`/api/export/gedcom`, `/api/import/gedcom`).

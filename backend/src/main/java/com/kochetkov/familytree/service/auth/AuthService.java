@@ -27,43 +27,39 @@ public class AuthService {
 
     @Transactional
     public AuthResponse register(RegisterRequest request) {
-        String email = request.email().trim().toLowerCase();
-        if (userRepository.existsByEmail(email)) {
-            throw new ApiException(HttpStatus.CONFLICT, "EMAIL_TAKEN", "Этот email уже зарегистрирован");
+        String nickname = request.nickname().trim();
+        if (userRepository.existsByNickname(nickname)) {
+            throw new ApiException(HttpStatus.CONFLICT, "NICKNAME_TAKEN", "Этот никнейм уже занят");
         }
 
         User user = new User();
-        user.setEmail(email);
+        user.setNickname(nickname);
         user.setPasswordHash(passwordEncoder.encode(request.password()));
         user.setDisplayName(request.displayName().trim());
-        user.setEnabled(true);
         userRepository.save(user);
 
         return toAuthResponse(user);
     }
 
     public AuthResponse login(LoginRequest request) {
-        String email = request.email().trim().toLowerCase();
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "INVALID_CREDENTIALS", "Неверный email или пароль"));
+        String nickname = request.nickname().trim();
+        User user = userRepository.findByNickname(nickname)
+                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "INVALID_CREDENTIALS", "Неверный никнейм или пароль"));
 
-        if (!user.isEnabled()) {
-            throw new ApiException(HttpStatus.FORBIDDEN, "USER_DISABLED", "Учётная запись отключена");
-        }
         if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
-            throw new ApiException(HttpStatus.UNAUTHORIZED, "INVALID_CREDENTIALS", "Неверный email или пароль");
+            throw new ApiException(HttpStatus.UNAUTHORIZED, "INVALID_CREDENTIALS", "Неверный никнейм или пароль");
         }
 
         return toAuthResponse(user);
     }
 
     private AuthResponse toAuthResponse(User user) {
-        String token = jwtService.generateToken(user.getId(), user.getEmail());
+        String token = jwtService.generateToken(user.getId(), user.getNickname());
         return new AuthResponse(
                 token,
                 jwtService.getExpirationSeconds(),
                 user.getId(),
-                user.getEmail(),
+                user.getNickname(),
                 user.getDisplayName()
         );
     }

@@ -88,6 +88,14 @@ mock like tree data is.
   `createdAt`, `createdBy`, `updatedAt`, `updatedBy`, `deletedAt`,
   `deletedBy`) to its own prefixed names — copy that whole block (swapping
   the prefix) for any new entity, don't hand-pick a subset.
+- `User`'s login identity is `nickname` (plain unique string, not an email —
+  no `@Email` validation, no format assumed), not `email`. There's also no
+  `enabled` flag — every row is implicitly usable; if disabling an account is
+  ever needed, that's what the already-present-but-unused `deletedAt`/
+  `deletedBy` soft-delete columns are for, not a dedicated boolean. Both the
+  JWT's `nickname` claim and `SecurityAuditorAware`'s `createdBy`/`updatedBy`
+  values come from `AppUserPrincipal.getUsername()`, which returns
+  `user.getNickname()`.
 - **Per-entity sequences, and the one JPA wrinkle that comes with it**:
   `BaseIdEntity.id` carries `@GeneratedValue(generator =
   "entity_id_seq_generator")` — that generator *name* is a fixed literal
@@ -105,7 +113,7 @@ mock like tree data is.
   `@EnableJpaAuditing` on `FamilyTreeApplication`. `createdBy`/`updatedBy`
   (`@CreatedBy`/`@LastModifiedBy`) are populated by
   `security/SecurityAuditorAware` — the current authenticated principal's
-  email, or the literal string `"system"` when there isn't one (e.g.
+  nickname, or the literal string `"system"` when there isn't one (e.g.
   self-registration, where the row being written is the not-yet-authenticated
   actor). `deletedAt`/`deletedBy` exist as plain nullable columns only —
   **nothing populates or filters on them yet**; an actual `DELETE` is still a
@@ -154,22 +162,41 @@ mock like tree data is.
 **Frontend** (`frontend/src/auth/`): the one exception to "everything talks to
 the mock" — `authApi.ts` calls the real backend directly
 (`http://localhost:8080/api/auth/...`, hardcoded for now) with `fetch()`, not
-through `src/api/`. `authState.ts` is a module-level reactive singleton (same
+through `src/api/`. `LoginPage.vue` is login-only — no register toggle/button
+and no `displayName` field; a single `{ nickname, password }` form posting to
+`/api/auth/login`. The backend's `/api/auth/register` endpoint still exists
+(nickname-based now, same as login) but nothing in the frontend calls it —
+account creation is out of the UI for now, not out of the contract.
+`authState.ts` is a module-level reactive singleton (same
 pattern as `src/api/db.ts` — no Pinia) holding the current `AuthSession`,
 persisted to `localStorage` under `family-tree-auth-session`. `App.vue` gates
-the whole app on `session` being set: `LoginPage.vue` (login/register toggle
-in one form) when it isn't, `FamilyTree.vue` when it is. `FamilyTree.vue`'s
-toolbar shows the current `displayName` and a "Выйти" button (`clearSession()`
-from `authState.ts`) — logging out just clears the session ref/localStorage,
-no backend call (there's no server-side session to invalidate; the JWT stays
-valid until it expires).
+the whole app in two steps: `LoginPage.vue` while `session` is unset, then
+`TreeSelectPage.vue` while `session` is set but `selectedTree`
+(`src/state/selectedTree.ts`, same module-singleton pattern, persisted under
+`family-tree-selected-tree`) isn't, then `FamilyTree.vue` once both are set.
+`FamilyTree.vue`'s toolbar shows the current `displayName` and a "Выйти"
+button (`clearSession()` from `authState.ts`) — logging out just clears the
+session ref/localStorage (which also clears `selectedTree`, so a later login
+as a different user can't reopen someone else's tree id), no backend call
+(there's no server-side session to invalidate; the JWT stays valid until it
+expires). A "Сменить дерево" button next to it only clears `selectedTree`,
+dropping back to `TreeSelectPage.vue` without logging out.
 
-Not wired up yet: `src/api/*` (tree data) doesn't send the `Authorization`
-header from `authState.ts`'s `authHeader()` — it doesn't need to, since it
-still talks to the in-memory mock, not the real backend. Once Person/
+`TreeSelectPage.vue` calls `GET /api/family-tree/find-by-user/{userId}`
+(`src/api/familyTree.ts`) — a second real, non-mocked endpoint alongside auth,
+built the same way (`fetch()` straight to the backend, not through
+`src/api/db.ts`) but *does* attach `authHeader()`, since everything except
+`/api/auth/**` sits behind the JWT filter. There's no create-tree endpoint
+yet, so the page only lists existing trees.
+
+**Picking a tree does not yet change which people/relationships are shown.**
+`src/api/*` (Person/Relationship/Photo — still fully mocked) doesn't send
+`authHeader()` either, and `Person` has no `family_tree_id` on the backend
+yet (see its entity comment) — so `TreeSelectPage.vue` is a real selection
+step with nothing downstream to scope by selection yet. Once Person/
 Relationship/Photo endpoints exist for real and `src/api/*` switches to
-`fetch()`, that's the point to start attaching `authHeader()` to those calls
-too.
+`fetch()`, that's the point to both attach `authHeader()` there and start
+actually filtering by `selectedTree.id`.
 
 ## Frontend architecture
 

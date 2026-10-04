@@ -23,11 +23,10 @@ CREATE TABLE users (
     users_updated_by VARCHAR(255) NOT NULL,
     users_deleted_at TIMESTAMP,
     users_deleted_by VARCHAR(255),
-    email         VARCHAR(255) NOT NULL,
+    nickname      VARCHAR(255) NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
     display_name  VARCHAR(255) NOT NULL,
-    enabled       BOOLEAN      NOT NULL,
-    CONSTRAINT uk_users_email UNIQUE (email)
+    CONSTRAINT uk_users_nickname UNIQUE (nickname)
 );
 ALTER SEQUENCE users_id_seq OWNED BY users.users_id;
 

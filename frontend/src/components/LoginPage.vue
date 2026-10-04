@@ -1,31 +1,25 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { login, register } from '../auth/authApi'
+import { login } from '../auth/authApi'
 import { setSession } from '../auth/authState'
 import { ApiError } from '../api/errors'
 
-const mode = ref<'login' | 'register'>('login')
-
-const email = ref('')
+const nickname = ref('')
 const password = ref('')
-const displayName = ref('')
 
 const submitting = ref(false)
 const error = ref('')
 
 async function submit() {
   error.value = ''
-  if (!email.value.trim() || !password.value.trim() || (mode.value === 'register' && !displayName.value.trim())) {
+  if (!nickname.value.trim() || !password.value.trim()) {
     error.value = 'Заполните все поля'
     return
   }
 
   submitting.value = true
   try {
-    const session =
-      mode.value === 'login'
-        ? await login({ email: email.value.trim(), password: password.value })
-        : await register({ email: email.value.trim(), password: password.value, displayName: displayName.value.trim() })
+    const session = await login({ nickname: nickname.value.trim(), password: password.value })
     setSession(session)
   } catch (e) {
     error.value = e instanceof ApiError ? e.message : 'Не удалось выполнить запрос'
@@ -33,21 +27,15 @@ async function submit() {
     submitting.value = false
   }
 }
-
-function switchMode() {
-  mode.value = mode.value === 'login' ? 'register' : 'login'
-  error.value = ''
-}
 </script>
 
 <template>
   <div class="login-page">
     <form class="login-card" @submit.prevent="submit">
       <h1>Семейное дерево</h1>
-      <p class="subtitle">{{ mode === 'login' ? 'Вход' : 'Регистрация' }}</p>
+      <p class="subtitle">Вход</p>
 
-      <label>Email<input v-model="email" type="email" autocomplete="username" /></label>
-      <label v-if="mode === 'register'">Имя<input v-model="displayName" type="text" autocomplete="name" /></label>
+      <label>Имя<input v-model="nickname" type="text" autocomplete="username" /></label>
       <label>
         Пароль
         <input v-model="password" type="password" autocomplete="current-password" />
@@ -55,12 +43,7 @@ function switchMode() {
 
       <p v-if="error" class="error">{{ error }}</p>
 
-      <button type="submit" class="btn" :disabled="submitting">
-        {{ mode === 'login' ? 'Войти' : 'Зарегистрироваться' }}
-      </button>
-      <button type="button" class="btn btn-ghost" @click="switchMode">
-        {{ mode === 'login' ? 'Нет аккаунта? Зарегистрироваться' : 'Уже есть аккаунт? Войти' }}
-      </button>
+      <button type="submit" class="btn" :disabled="submitting">Войти</button>
     </form>
   </div>
 </template>
