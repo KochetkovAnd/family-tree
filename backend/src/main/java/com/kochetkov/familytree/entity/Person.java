@@ -37,9 +37,8 @@ public class Person extends AuditEntity {
     @Column(name = "person_firstname", nullable = false)
     String firstName;
 
-    // Отчество — table calls it person_secondname.
     @Column(name = "person_secondname")
-    String middleName;
+    String secondName;
 
     @Column(name = "person_birthday")
     LocalDate birthDate;

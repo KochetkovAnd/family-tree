@@ -14,7 +14,7 @@ import java.time.LocalDate;
 public class PersonDTO extends AuditEntityDTO {
     String lastName;
     String firstName;
-    String middleName;
+    String secondName;
     LocalDate birthDate;
     String birthPlace;
 }
